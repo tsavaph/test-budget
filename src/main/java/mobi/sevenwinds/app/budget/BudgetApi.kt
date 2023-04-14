@@ -12,6 +12,7 @@ import com.papsign.ktor.openapigen.route.path.normal.post
 import com.papsign.ktor.openapigen.route.response.respond
 import com.papsign.ktor.openapigen.route.route
 import mobi.sevenwinds.app.budget.author.AuthorService
+import java.util.*
 
 fun NormalOpenAPIRoute.budget() {
     route("/budget") {
@@ -37,7 +38,8 @@ data class BudgetRecord(
     @Min(1900) val year: Int,
     @Min(1) @Max(12) val month: Int,
     @Min(1) val amount: Int,
-    val type: BudgetType
+    val type: BudgetType,
+    val authorId: Int?
 )
 
 data class BudgetYearParam(
