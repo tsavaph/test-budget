@@ -6,6 +6,10 @@ import mobi.sevenwinds.common.jsonBody
 import mobi.sevenwinds.common.toResponse
 import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.joda.time.DateTime
+import org.joda.time.DateTimeUtils
+import org.joda.time.format.DateTimeFormat
+import org.joda.time.format.DateTimeFormatter
 import org.junit.Assert
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -63,6 +67,41 @@ class BudgetApiKtTest : ServerTest() {
     }
 
     @Test
+    fun testBudgetPaginationWithAuthorName() {
+        DateTimeUtils.setCurrentMillisFixed(0)
+        val authorName = "Круглов Квадрат Тестович"
+        addAuthorRecord(AuthorRecord(authorName))
+        val authorId = 1
+
+        addRecord(BudgetRecord(2020, 1, 1, BudgetType.Приход, authorId))
+        addRecord(BudgetRecord(2020, 2, 2, BudgetType.Приход, authorId))
+        addRecord(BudgetRecord(2020, 3, 3, BudgetType.Приход, authorId))
+        addRecord(BudgetRecord(2020, 4, 4, BudgetType.Приход, authorId))
+        addRecord(BudgetRecord(2020, 5, 5, BudgetType.Приход))
+        addRecord(BudgetRecord(2020, 6, 6, BudgetType.Приход))
+
+        RestAssured.given()
+            .queryParam("limit", 2)
+            .queryParam("offset", 1)
+            .queryParam("authorName", "КвАдРат")
+            .get("/budget/year/2020/stats")
+            .toResponse<BudgetYearStatsResponse>().let { response ->
+                println("${response.total} / ${response.items} / ${response.totalByType}")
+
+                Assert.assertEquals(4, response.total)
+                Assert.assertEquals(2, response.items.size)
+                Assert.assertEquals(10, response.totalByType[BudgetType.Приход.name])
+
+                Assert.assertEquals("Круглов Квадрат Тестович", response.items[0].authorName)
+                Assert.assertEquals(getDateTimeAsString(), response.items[0].authorCreatedAt)
+                Assert.assertEquals("Круглов Квадрат Тестович", response.items[1].authorName)
+                Assert.assertEquals(getDateTimeAsString(), response.items[1].authorCreatedAt)
+            }
+
+        DateTimeUtils.setCurrentMillisSystem()
+    }
+
+    @Test
     fun testInvalidMonthValues() {
         RestAssured.given()
             .jsonBody(BudgetRecord(2020, -5, 5, BudgetType.Приход))
@@ -83,4 +122,20 @@ class BudgetApiKtTest : ServerTest() {
                 Assert.assertEquals(record, response)
             }
     }
+
+    private fun addAuthorRecord(authorRecord: AuthorRecord) {
+        RestAssured.given()
+            .jsonBody(authorRecord)
+            .post("/author/add")
+            .toResponse<AuthorRecord>().let { response ->
+                Assert.assertEquals(authorRecord, response)
+            }
+    }
+
+    private fun getDateTimeAsString() : String {
+        val dateTime = DateTime.now()
+        val dtf: DateTimeFormatter = DateTimeFormat.forPattern("dd.MM.yyyy HH:mm:ss")
+        return dtf.print(dateTime)
+    }
+
 }
